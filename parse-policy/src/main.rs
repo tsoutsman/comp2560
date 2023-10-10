@@ -1,60 +1,27 @@
 use std::{
     ffi::{c_void, CStr, CString},
-    io,
     mem::MaybeUninit,
     sync::Mutex,
 };
 
 use bindings::{
-    class_datum, hashtab_map, perm_datum, policydb, policydb_init, policydb_set_target_platform,
-    read_source_policy, role_datum, type_datum, DENY_UNKNOWN, POLICY_BASE, SEPOL_TARGET_SELINUX,
-    SYM_CLASSES, SYM_ROLES, SYM_TYPES,
+    avrule_block_t, class_datum, hashtab_map, perm_datum, policydb, policydb_init,
+    policydb_set_target_platform, read_source_policy, role_datum, type_datum, AVRULE_ALLOWED,
+    AVRULE_NEVERALLOW, DENY_UNKNOWN, POLICY_BASE, SEPOL_TARGET_SELINUX, SYM_CLASSES, SYM_ROLES,
+    SYM_TYPES,
 };
 // TODO: SYM_BOOLS, SYM_CATS, SYM_COMMONS, SYM_LEVELS, SYM_USERS
-use serde::Serialize;
 
-#[derive(Debug, Clone, Serialize)]
-pub struct Policy {
-    classes: Vec<Class>,
-    types: Vec<Type>,
-    roles: Vec<Role>,
-    rules: Vec<Rule>,
-}
+mod ebitmap;
+mod model;
+mod py;
 
-#[derive(Debug, Clone, Serialize)]
-pub struct Class {
-    id: u32,
-    name: String,
-    permissions: Vec<Permission>,
-    default_user: i8,
-    default_role: i8,
-    default_type: i8,
-    default_range: i8,
-}
+use model::{Class, Permission, Policy, Role, Rule, Type};
 
-#[derive(Debug, Clone, Serialize)]
-pub struct Permission {
-    id: u32,
-    name: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct Role {
-    id: u32,
-    name: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct Type {
-    id: u32,
-    name: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct Rule {
-    id: u32,
-    name: String,
-}
+use crate::{
+    bindings::{user_datum, SYM_USERS},
+    model::{RuleType, TypeSet, User},
+};
 
 fn main() {
     let mut policy = new_policy();
@@ -67,11 +34,14 @@ fn main() {
         types: types(&policy),
         roles: roles(&policy),
         classes: classes(&policy),
+        users: users(&policy),
         rules: rules(&policy),
     };
 
     // println!("{policy:#?}");
-    serde_json::to_writer(io::stdout(), &policy).unwrap();
+
+    // py::generate(policy);
+    println!("{}", py::generate(policy));
 }
 
 fn new_policy() -> policydb {
@@ -102,6 +72,7 @@ fn classes(policy: &policydb) -> Vec<Class> {
         ) -> i32 {
             let name = unsafe { CStr::from_ptr(a) }.to_str().unwrap().to_owned();
             let value = unsafe { &*(value as *mut perm_datum) };
+            // println!("permission: {name:?} {value:#?}");
 
             unsafe { &*(result as *mut Mutex<Vec<Permission>>) }
                 .lock()
@@ -212,8 +183,85 @@ fn roles(policy: &policydb) -> Vec<Role> {
     ret
 }
 
-fn rules(_policy: &policydb) -> Vec<Rule> {
-    Vec::new()
+fn users(policy: &policydb) -> Vec<User> {
+    extern "C" fn construct_users(a: *mut i8, value: *mut c_void, result: *mut c_void) -> i32 {
+        let name = unsafe { rstr(a) };
+        let value = unsafe { &*(value as *mut user_datum) };
+
+        unsafe { &*(result as *mut Mutex<Vec<User>>) }
+            .lock()
+            .unwrap()
+            .push(User {
+                id: value.s.value,
+                name,
+                roles: unsafe { ebitmap::Iter::new(value.roles.roles) }.collect(),
+            });
+
+        0
+    }
+
+    let mut result = Mutex::new(Vec::new());
+    unsafe {
+        hashtab_map(
+            policy.symtab[SYM_USERS as usize].table,
+            Some(construct_users),
+            &mut result as *mut _ as *mut _,
+        );
+    };
+
+    let ret = result.lock().unwrap().clone();
+    ret
+}
+
+fn rules(policy: &policydb) -> Vec<Rule> {
+    let mut result = Vec::new();
+
+    let mut block_ptr: *const avrule_block_t = policy.global;
+    while !block_ptr.is_null() {
+        let block = unsafe { &*block_ptr };
+
+        let mut branch_list_ptr = block.branch_list;
+        while !branch_list_ptr.is_null() {
+            let branch_list = unsafe { &*branch_list_ptr };
+
+            let mut rule_ptr = branch_list.avrules;
+            while !rule_ptr.is_null() {
+                let rule = unsafe { &*rule_ptr };
+
+                let mut permissions = Vec::new();
+
+                let mut permission_ptr = rule.perms;
+                while !permission_ptr.is_null() {
+                    let permission = unsafe { &*permission_ptr };
+                    for i in 0..32 {
+                        if permission.data >> i & 1 == 1 {
+                            // They one-index. Don't ask why.
+                            permissions.push((permission.tclass, i + 1));
+                        }
+                    }
+                    permission_ptr = permission.next;
+                }
+
+                result.push(Rule {
+                    ty: match rule.specified {
+                        AVRULE_ALLOWED => RuleType::Allow,
+                        AVRULE_NEVERALLOW => RuleType::NeverAllow,
+                        _ => panic!("unsupported rule type"),
+                    },
+                    source_types: TypeSet::from(&rule.stypes),
+                    target_types: TypeSet::from(&rule.ttypes),
+                    permissions,
+                });
+                rule_ptr = rule.next;
+            }
+
+            branch_list_ptr = branch_list.next;
+        }
+
+        block_ptr = block.next;
+    }
+
+    result
 }
 
 unsafe fn rstr(ptr: *mut i8) -> String {
@@ -223,6 +271,7 @@ unsafe fn rstr(ptr: *mut i8) -> String {
 #[allow(non_upper_case_globals)]
 #[allow(non_camel_case_types)]
 #[allow(non_snake_case)]
+#[allow(clippy::useless_transmute)]
 pub mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
