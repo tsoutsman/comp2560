@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fs, path::Path};
 
 use crate::{model::User, Class, Policy, Role, Rule, Type};
 
@@ -28,7 +28,7 @@ av_allow = Function("av_allow", type, type, cclass, permission, BoolSort())
 // type_id = Function("type-id", type, IntSort())
 // class_id = Function("class-id", cclass, IntSort())
 
-pub(crate) fn generate(policy: Policy) -> String {
+pub(crate) fn generate(policy: Policy, additional_constraints_path: Option<&Path>) -> String {
     let Policy {
         classes,
         types,
@@ -75,6 +75,12 @@ pub(crate) fn generate(policy: Policy) -> String {
 
     python.push_str(&rules);
     python.push('\n');
+
+    if let Some(path) = additional_constraints_path {
+        python.push_str("# Additional constraints\n\n");
+        python.push_str(&fs::read_to_string(path).unwrap());
+        python.push('\n');
+    }
 
     python.push_str("# Output\n\nprint(solver.check())");
     python.push('\n');

@@ -1,6 +1,8 @@
 use std::{
+    env,
     ffi::{c_void, CStr, CString},
     mem::MaybeUninit,
+    path::PathBuf,
     sync::Mutex,
 };
 
@@ -25,10 +27,21 @@ use crate::{
 
 fn main() {
     let mut policy = new_policy();
-    let file = CString::new("../policy.conf").unwrap();
+
+    let mut args = env::args();
+    args.next().unwrap();
+    let policy_file_path = CString::new(args.next().expect("no policy file provided")).unwrap();
+    let additional_constraints_path = args.next().map(|path| PathBuf::from(path));
+
     let progname = CString::new("parse-policy").unwrap();
 
-    unsafe { read_source_policy(&mut policy as *mut _, file.as_ptr(), progname.as_ptr()) };
+    unsafe {
+        read_source_policy(
+            &mut policy as *mut _,
+            policy_file_path.as_ptr(),
+            progname.as_ptr(),
+        )
+    };
 
     let policy = Policy {
         types: types(&policy),
@@ -38,10 +51,10 @@ fn main() {
         rules: rules(&policy),
     };
 
-    // println!("{policy:#?}");
-
-    // py::generate(policy);
-    println!("{}", py::generate(policy));
+    println!(
+        "{}",
+        py::generate(policy, additional_constraints_path.as_deref())
+    );
 }
 
 fn new_policy() -> policydb {

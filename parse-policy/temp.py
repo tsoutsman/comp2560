@@ -38,9 +38,11 @@ student_r = Const("student_r", role)
 
 # Users
 
-teacher_r = Const("teacher_r", user)
-object_r = Const("object_r", user)
-student_r = Const("student_r", user)
+bob = Const("bob", user)
+solver.add(user_has_role(bob, teacher_r))
+
+alice = Const("alice", user)
+solver.add(user_has_role(alice, student_r))
 
 # Rules
 
@@ -56,6 +58,34 @@ solver.add(av_allow(student_t, lecture_slides, file, view) == True)
 
 solver.add(av_allow(student_t, group_presentations, file, modify) == True)
 solver.add(av_allow(student_t, group_presentations, file, view) == True)
+
+# Additional constraints
+
+u = Const("u", user)
+r = Const("r", role)
+t = Const("t", type)
+
+solver.add(
+    ForAll(
+        [u],
+        Implies(
+            user_has_role(u, student_r),
+            ForAll(
+                [r],
+                Implies(
+                    user_has_role(u, r),
+                    ForAll(
+                        [t],
+                        Implies(
+                            role_has_type(r, t),
+                            av_allow(t, lecture_slides, file, create) == False,
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+)
 
 # Output
 
