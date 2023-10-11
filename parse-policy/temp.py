@@ -39,10 +39,11 @@ student_r = Const("student_r", role)
 # Users
 
 bob = Const("bob", user)
-solver.add(user_has_role(bob, teacher_r))
+solver.add(user_has_role(bob, teacher_r) == True)
 
 alice = Const("alice", user)
-solver.add(user_has_role(alice, student_r))
+solver.add(user_has_role(alice, teacher_r) == True)
+solver.add(user_has_role(alice, student_r) == True)
 
 # Rules
 
@@ -69,15 +70,15 @@ solver.add(
     ForAll(
         [u],
         Implies(
-            user_has_role(u, student_r),
+            user_has_role(u, student_r) == True,
             ForAll(
                 [r],
                 Implies(
-                    user_has_role(u, r),
+                    user_has_role(u, r) == True,
                     ForAll(
                         [t],
                         Implies(
-                            role_has_type(r, t),
+                            role_has_type(r, t) == True,
                             av_allow(t, lecture_slides, file, create) == False,
                         ),
                     ),
@@ -90,4 +91,3 @@ solver.add(
 # Output
 
 print(solver.check())
-

@@ -171,6 +171,7 @@ fn roles(policy: &policydb) -> Vec<Role> {
     extern "C" fn construct_roles(a: *mut i8, value: *mut c_void, result: *mut c_void) -> i32 {
         let name = unsafe { rstr(a) };
         let value = unsafe { &*(value as *mut role_datum) };
+        // println!("role: {value:#?}");
 
         unsafe { &*(result as *mut Mutex<Vec<Role>>) }
             .lock()
@@ -178,6 +179,7 @@ fn roles(policy: &policydb) -> Vec<Role> {
             .push(Role {
                 id: value.s.value,
                 name,
+                types: unsafe { ebitmap::Iter::new(value.types.types) }.collect(),
             });
 
         0

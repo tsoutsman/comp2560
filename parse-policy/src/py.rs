@@ -57,6 +57,15 @@ pub(crate) fn generate(policy: Policy, additional_constraints_path: Option<&Path
             .collect::<Vec<String>>()
             .join("\n"),
     );
+    let roles = format!(
+        "# Roles\n\n{}",
+        roles
+            .into_iter()
+            .map(|role| role.into_python(&types))
+            // Yes, this collect could technically be avoided.
+            .collect::<Vec<String>>()
+            .join("\n"),
+    );
 
     python.push_str("# Classes\n\n");
     python.extend(classes.into_iter().map(Class::into_python));
@@ -66,8 +75,7 @@ pub(crate) fn generate(policy: Policy, additional_constraints_path: Option<&Path
     python.extend(types.into_iter().map(Type::into_python));
     python.push('\n');
 
-    python.push_str("# Roles\n\n");
-    python.extend(roles.into_iter().map(Role::into_python));
+    python.push_str(&roles);
     python.push('\n');
 
     python.push_str(&users);
@@ -102,8 +110,16 @@ impl Class {
 }
 
 impl Role {
-    fn into_python(self) -> String {
-        format!("{name} = Const(\"{name}\", role)\n", name = self.name)
+    fn into_python(self, types: &Vec<Type>) -> String {
+        let mut result = format!("{name} = Const(\"{name}\", role)\n", name = self.name);
+        for type_id in self.types {
+            result.push_str(&format!(
+                "solver.add(role_has_type({}, {}) == True)\n",
+                self.name,
+                types.into_iter().find(|ty| ty.id == type_id).unwrap().name,
+            ))
+        }
+        result
     }
 }
 
@@ -118,7 +134,7 @@ impl User {
         let mut result = format!("{name} = Const(\"{name}\", user)\n", name = self.name);
         for role_id in self.roles {
             result.push_str(&format!(
-                "solver.add(user_has_role({name}, {role}))\n",
+                "solver.add(user_has_role({name}, {role}) == True)\n",
                 name = self.name,
                 role = roles
                     .into_iter()

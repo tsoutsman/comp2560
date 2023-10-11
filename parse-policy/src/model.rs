@@ -41,6 +41,7 @@ pub(crate) struct Permission {
 pub(crate) struct Role {
     pub(crate) id: u32,
     pub(crate) name: String,
+    pub(crate) types: Vec<u32>,
 }
 
 #[derive(Debug, Clone, Serialize)]

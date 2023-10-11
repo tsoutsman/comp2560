@@ -19,16 +19,16 @@ impl Iterator for Iter {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
+            if self.ptr.is_null() {
+                return None;
+            }
+
             let node = unsafe { &*self.ptr };
 
             if self.cursor == 32 {
-                if node.next.is_null() {
-                    return None;
-                } else {
-                    self.ptr = node.next;
-                    self.cursor = 0;
-                    continue;
-                }
+                self.ptr = node.next;
+                self.cursor = 0;
+                continue;
             }
 
             if node.map >> self.cursor & 1 == 1 {
