@@ -33,7 +33,6 @@ fn main() {
     compile_c_file("y.tab.c", "tab");
     compile_c_file("queue.c", "queue");
     compile_c_file("parse_util.c", "parse_util");
-    compile_c_file("checkpolicy.c", "checkpolicy");
     compile_c_file("module_compiler.c", "module_compiler");
     compile_c_file("policy_define.c", "policy_define");
 

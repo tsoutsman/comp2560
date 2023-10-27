@@ -1,8 +1,8 @@
-use std::{collections::HashMap, fs, path::Path};
+use std::{fs, path::Path};
 
-use crate::{model::User, Class, Policy, Role, Rule, Type};
+use crate::model::{Class, Policy, Role, Rule, Type, User};
 
-const PRELUDE: &str = r#"#!/usr/bin/env/ python3
+const PRELUDE: &str = r#"#!/usr/bin/env python3
 
 from z3 import *
 
@@ -28,7 +28,7 @@ av_allow = Function("av_allow", type, type, cclass, permission, BoolSort())
 // type_id = Function("type-id", type, IntSort())
 // class_id = Function("class-id", cclass, IntSort())
 
-pub(crate) fn generate(policy: Policy, additional_constraints_path: Option<&Path>) -> String {
+pub fn generate(policy: Policy, additional_constraints_path: Option<&Path>) -> String {
     let Policy {
         classes,
         types,
@@ -110,13 +110,13 @@ impl Class {
 }
 
 impl Role {
-    fn into_python(self, types: &Vec<Type>) -> String {
+    fn into_python(self, types: &[Type]) -> String {
         let mut result = format!("{name} = Const(\"{name}\", role)\n", name = self.name);
         for type_id in self.types {
             result.push_str(&format!(
                 "solver.add(role_has_type({}, {}) == True)\n",
                 self.name,
-                types.into_iter().find(|ty| ty.id == type_id).unwrap().name,
+                types.iter().find(|ty| ty.id == type_id).unwrap().name,
             ))
         }
         result
@@ -130,17 +130,13 @@ impl Type {
 }
 
 impl User {
-    fn into_python(self, roles: &Vec<Role>) -> String {
+    fn into_python(self, roles: &[Role]) -> String {
         let mut result = format!("{name} = Const(\"{name}\", user)\n", name = self.name);
         for role_id in self.roles {
             result.push_str(&format!(
                 "solver.add(user_has_role({name}, {role}) == True)\n",
                 name = self.name,
-                role = roles
-                    .into_iter()
-                    .find(|role| role.id == role_id)
-                    .unwrap()
-                    .name,
+                role = roles.iter().find(|role| role.id == role_id).unwrap().name,
             ));
         }
         result
@@ -148,7 +144,7 @@ impl User {
 }
 
 impl Rule {
-    fn into_python(self, classes: &Vec<Class>, types: &Vec<Type>) -> String {
+    fn into_python(self, classes: &Vec<Class>, types: &[Type]) -> String {
         let mut result = String::new();
         let permissions = self.permissions;
 
@@ -176,12 +172,12 @@ impl Rule {
                     result.push_str(&format!(
                         "solver.add(av_allow({}, {}, {}, {}) == True)\n",
                         types
-                            .into_iter()
+                            .iter()
                             .find(|ty| ty.id == *source_type)
                             .map(|ty| &ty.name)
                             .unwrap(),
                         types
-                            .into_iter()
+                            .iter()
                             .find(|ty| ty.id == *target_type)
                             .map(|ty| &ty.name)
                             .unwrap(),

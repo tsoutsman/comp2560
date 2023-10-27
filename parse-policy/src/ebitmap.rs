@@ -1,6 +1,6 @@
 use crate::bindings::{ebitmap_node_t, ebitmap_t};
 
-pub(crate) struct Iter {
+pub struct Iter {
     ptr: *const ebitmap_node_t,
     cursor: u32,
 }
@@ -25,7 +25,7 @@ impl Iterator for Iter {
 
             let node = unsafe { &*self.ptr };
 
-            if self.cursor == 32 {
+            if self.cursor == 64 {
                 self.ptr = node.next;
                 self.cursor = 0;
                 continue;

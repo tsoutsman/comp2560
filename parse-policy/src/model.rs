@@ -5,69 +5,69 @@ use serde::Serialize;
 use crate::{bindings::type_set, ebitmap};
 
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct Policy {
-    pub(crate) classes: Vec<Class>,
-    pub(crate) types: Vec<Type>,
-    pub(crate) roles: Vec<Role>,
-    pub(crate) users: Vec<User>,
-    pub(crate) rules: Vec<Rule>,
+pub struct Policy {
+    pub classes: Vec<Class>,
+    pub types: Vec<Type>,
+    pub roles: Vec<Role>,
+    pub users: Vec<User>,
+    pub rules: Vec<Rule>,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct Class {
-    pub(crate) id: u32,
-    pub(crate) name: String,
-    pub(crate) permissions: Vec<Permission>,
-    pub(crate) default_user: i8,
-    pub(crate) default_role: i8,
-    pub(crate) default_type: i8,
-    pub(crate) default_range: i8,
+pub struct Class {
+    pub id: u32,
+    pub name: String,
+    pub permissions: Vec<Permission>,
+    pub default_user: i8,
+    pub default_role: i8,
+    pub default_type: i8,
+    pub default_range: i8,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct User {
-    pub(crate) id: u32,
-    pub(crate) name: String,
-    pub(crate) roles: Vec<u32>,
+pub struct User {
+    pub id: u32,
+    pub name: String,
+    pub roles: Vec<u32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct Permission {
-    pub(crate) id: u32,
-    pub(crate) name: String,
+pub struct Permission {
+    pub id: u32,
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct Role {
-    pub(crate) id: u32,
-    pub(crate) name: String,
-    pub(crate) types: Vec<u32>,
+pub struct Role {
+    pub id: u32,
+    pub name: String,
+    pub types: Vec<u32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct Type {
-    pub(crate) id: u32,
-    pub(crate) name: String,
+pub struct Type {
+    pub id: u32,
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct Rule {
-    pub(crate) ty: RuleType,
-    pub(crate) source_types: TypeSet,
-    pub(crate) target_types: TypeSet,
-    pub(crate) permissions: Vec<(u32, u32)>,
+pub struct Rule {
+    pub ty: RuleType,
+    pub source_types: TypeSet,
+    pub target_types: TypeSet,
+    pub permissions: Vec<(u32, u32)>,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub(crate) enum RuleType {
+pub enum RuleType {
     Allow,
     NeverAllow,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct TypeSet {
-    pub(crate) types: HashSet<u32>,
-    pub(crate) negatives: HashSet<u32>,
+pub struct TypeSet {
+    pub types: HashSet<u32>,
+    pub negatives: HashSet<u32>,
 }
 
 impl From<&type_set> for TypeSet {
